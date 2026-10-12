@@ -398,6 +398,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 | `client/bundle.js` | 浏览器半边：插件页卡片 + 设置侧栏「SSH 主机」，窄列纵向布局、登录方式/密码编辑、「怎么用」提示，以及 `/ssh` 的主机选择弹窗；无构建步骤 |
 | `lib/index.js` | `name` / `inject: ['tools']` / `Config` / `apply`；装载期即校验清单，`ctx.effect` 回收资源与路由 |
 | `test/*.test.mjs` | 202 个测试（含界面链路、volatile 回归、密码 askpass、浏览器半边渲染、`/ssh` 命令契约）；`test/remote.test.mjs` 为真实服务器集成测试（默认跳过，密码用例需显式给密码） |
+| `LICENSE` / `.github/workflows/test.yml` | MIT 许可证；CI 在 Node 22.x / 24.x 上跑 `npm ci && npm test`（真实服务器用例因缺环境变量自动跳过） |
 | `scripts/smoke-remote.mjs` | 把模型会看到的每一步原样打印 |
 | `scripts/smoke-ui.mjs` | 界面链路端到端（路由 → 写文件 → 重载 → 真实 SSH）；给了 `DSH_SSH_HOSTS_REMOTE_PASSWORD` 时额外跑一遍密码登录 |
 
@@ -417,6 +418,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 | 真实 cordis 装载 | `Context + SystemPrompt + ToolRuntime + 本插件` 一次装成，`ctx.tools.get('ssh_run')` 可达，7 个工具全部注册；有 `webServer`/`connection` 时路由一并挂上，无则静默降级 |
 | 真实 CLI 安装 | `dsh plugin --profile web add <dir>` → profile `dsh.profile.bundles` 自动追加 `dsh-ssh-hosts`；`dsh web --dump-config` 组出 `# == dsh-ssh-hosts` 层；再通过 profile 的 `node_modules/dsh-ssh-hosts` 软链接 + 安装目录里的 cordis/dsh-tools 启动，7 个工具全部注册（以上均在 `/tmp` 里的临时 DSH_HOME 完成，未改动真实 profile） |
 | tgz 安装（0.3.0） | 临时 DSH_HOME 里 `dsh plugin --profile web add ./dsh-ssh-hosts-0.3.0.tgz` 成功，包内含 `client/bundle.js`，`--dump-config` 组出同一层。profile 里不装 `@deepseek-ai/*`：桌面端由 `dsh-plugin-desktop-beta/src/module-resolution.ts` 的 profile 解析器兜底（profile → `~/.dsh/profiles/node_modules` → App 安装树），所以插件里的 `@deepseek-ai/dsh-tools` 引用在 App 内可解析 |
+| 公开仓库 + CI | https://github.com/alfredhuang211/dsh-ssh-hosts（MIT，公开）：`git archive HEAD` 导出干净树 → `npm ci`（23 个包，全部来自 registry.npmjs.org）→ `npm test` 得 202/189/0/13，与本地一致；GitHub Actions 上 Node 22.x 与 24.x 两个矩阵任务均 success（日志里可见 `# tests 202` / `# fail 0`）。仓库里的测试机域名、用户、密钥路径都是占位值，真实值通过 `DSH_SSH_HOSTS_REMOTE_*` 传入；`.test-keys/`、`node_modules/`、`*.tgz` 由 `.gitignore` 挡住，远端树已核对无私钥/凭据 |
 | 桌面 profile 安装 | `dsh plugin --profile desktop add` 被 Electron 独占策略拒绝；改为按 App 写入的形态加 `link:` 依赖 + `dsh.profile.bundles` 条目，`node_modules/dsh-ssh-hosts` 软链到本目录，重启 App 即可加载（真实 GUI 点选路径仍待你确认） |
 
 测试目标机：一台真实服务器（Ubuntu 20.04 / Linux 5.4，用户 `ubuntu`；域名/用户/端口/密钥路径都通过 `DSH_SSH_HOSTS_REMOTE_*` 环境变量传入，仓库里只留占位值），仅用 `.test-keys/id_ed25519` 密钥认证，密码从未落盘。
