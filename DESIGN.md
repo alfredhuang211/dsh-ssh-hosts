@@ -413,7 +413,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 | 冒烟脚本 | `node scripts/smoke-remote.mjs` 全程 exit 0；`ssh_ls /etc`、`ssh_write` 原子写、`ssh_edit`、行区间读取、错误提示全部符合预期 |
 | 界面链路 | `node scripts/smoke-ui.mjs` exit 0（含真实 SSH 连通性测试与「UI 加的主机工具立刻可用」）；`DSH_SSH_HOSTS_REMOTE_PASSWORD=... node scripts/smoke-ui.mjs` 额外 exit 0：界面填密码 → 清单只留引用名 → `ssh_run` 用密码登录成功 → 删除后凭据清空 |
 | 浏览器半边渲染 | 用最小 React 替身跑「首屏 → 跑 effect → 二次渲染」：加载完成后渲染出主机块（含 `密码 / 已保存（file）` 徽章）与「怎么用」，渲染树里**没有 table**、没有密码值与凭据名；`HostEditor` 的密码框 `type=password` 且值为空、登录方式四个选项齐全；`draftOf/payloadOf` 覆盖四种登录方式的字段增删 |
-| `/ssh` 命令端到端（真插件装载 + 真 commands 注册 + 真服务器） | `/ssh` 注册成功（名字/描述/参数提示齐全）；裸命令报当前值 + 可用主机；`/ssh gzlh` → `ssh_hosts` 报 `defaultHost: gzlh, defaultSource: session` 且**省略 host 的 `ssh_run` 真的落在 gzlh**（`Linux`）；别的会话仍报 `none`；`/ssh nope` 报错并列出可用主机；`/ssh clear` 之后省略 host 立刻报 `no-host` |
+| `/ssh` 命令端到端（真插件装载 + 真 commands 注册 + 真服务器） | `/ssh` 注册成功（名字/描述/参数提示齐全）；裸命令报当前值 + 可用主机；`/ssh test-host` → `ssh_hosts` 报 `defaultHost: test-host, defaultSource: session` 且**省略 host 的 `ssh_run` 真的落在 test-host**（`Linux`）；别的会话仍报 `none`；`/ssh nope` 报错并列出可用主机；`/ssh clear` 之后省略 host 立刻报 `no-host` |
 | 真实 harness 契约 | 用真实 `@deepseek-ai/dsh-tools` 的 `defineTool` + `validateJsonSchemaValue` + `assertObjectJsonSchema` 校验 7 个工具的参数/输出 schema 与执行结果 |
 | 真实 cordis 装载 | `Context + SystemPrompt + ToolRuntime + 本插件` 一次装成，`ctx.tools.get('ssh_run')` 可达，7 个工具全部注册；有 `webServer`/`connection` 时路由一并挂上，无则静默降级 |
 | 真实 CLI 安装 | `dsh plugin --profile web add <dir>` → profile `dsh.profile.bundles` 自动追加 `dsh-ssh-hosts`；`dsh web --dump-config` 组出 `# == dsh-ssh-hosts` 层；再通过 profile 的 `node_modules/dsh-ssh-hosts` 软链接 + 安装目录里的 cordis/dsh-tools 启动，7 个工具全部注册（以上均在 `/tmp` 里的临时 DSH_HOME 完成，未改动真实 profile） |
