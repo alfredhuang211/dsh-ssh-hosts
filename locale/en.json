@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SSH Hosts",
+    "description": "Save a list of SSH servers and let the agent work on them by host name: run commands and read, write or edit remote files."
+  }
+}

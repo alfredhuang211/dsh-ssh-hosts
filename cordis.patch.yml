@@ -1,0 +1,17 @@
+# dsh-ssh-hosts bundle patch —— 把插件挂进 profile
+#
+#   id   = profile 条目 id，同时也是设置命名空间（设置页按它归档）
+#   name = 模块标识符，按 profile 目录解析（装成 npm 包后就是包名）
+#
+# 所有字段都有 schema 默认值，所以这里可以只写一行。
+# 需要覆盖时打开 config（用户配置请写在 profile 的 patch 里，或插件设置页里）：
+#
+#   config:
+#     hostsFile: ''                 # 留空 = $DSH_HOME/ssh-hosts.yaml
+#     defaultHost: web-01
+#     strictHostKeyChecking: accept-new
+#     timeoutMs: 60000
+#
+- insert:
+    - id: ssh-hosts
+      name: 'dsh-ssh-hosts'

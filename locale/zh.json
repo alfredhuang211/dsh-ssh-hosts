@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "SSH 主机",
+    "description": "保存一组 SSH 服务器，让 agent 用主机名引用：执行命令，以及读写、编辑远端文件。"
+  }
+}

@@ -1,0 +1,62 @@
+# dsh-ssh-hosts 主机清单示例
+#
+# 复制到 $DSH_HOME/ssh-hosts.yaml（默认 ~/.dsh/ssh-hosts.yaml），然后：
+#   chmod 600 ~/.dsh/ssh-hosts.yaml
+# 权限不是 0600 时插件会拒绝加载 —— 这是故意的，别改成 644 绕过。
+#
+# 这里只存“怎么连”，不存任何秘密：密钥内容 / passphrase / ssh-agent 都留给 OpenSSH；
+# 密码不写在这里，只写它的“名字”（passwordRef），值存在 DSH 凭据库里
+# （$DSH_HOME/.credentials.yaml，0600），由插件的设置界面写入。
+# name 就是 agent 在会话里引用的名字。
+
+version: 1
+
+hosts:
+  # 最常见：密钥 + 默认端口
+  - name: web-01
+    host: 10.0.0.11
+    user: deploy
+    identityFile: ~/.ssh/id_ed25519
+    defaultWorkdir: /srv/app
+    description: 生产 Web 前端（Nginx + 静态资源）
+    tags: [prod, web]
+
+  # 只读巡检机：文件工具会拒绝写，ssh_run 仍由 DSH 审批把关
+  - name: db-01
+    host: db01.internal.example.com
+    port: 2222
+    user: readonly
+    identityFile: ~/.ssh/id_ed25519_ro
+    defaultWorkdir: /var/log
+    description: 数据库只读巡检（日志、磁盘、连接数）
+    tags: [prod, db, readonly]
+    readOnly: true
+
+  # 经跳板机访问的内网机；proxyJump 可以引用本清单里的 name，也可以直接写 user@host:port
+  - name: app-int-02
+    host: 172.16.3.22
+    user: ubuntu
+    identityFile: ~/.ssh/id_ed25519
+    proxyJump: bastion
+    defaultWorkdir: /opt/app
+    description: 内网应用节点（经跳板）
+    tags: [int, app]
+
+  # 只能用密码登录的老机器：密码本身别写进这个文件（写了会被拒绝并提示），
+  # 在设置界面「SSH 主机 → 登录方式：密码」里填一次即可。
+  - name: legacy-db
+    host: 10.0.0.42
+    user: root
+    passwordRef: DSH_SSH_HOSTS_PASSWORD_LEGACY_DB
+    defaultWorkdir: /var/lib/mysql
+    description: 老数据库（只支持密码登录）
+    tags: [legacy, db]
+
+  - name: bastion
+    host: bastion.example.com
+    user: jump
+    identityFile: ~/.ssh/id_ed25519
+    description: 跳板机
+    tags: [infra]
+    connectTimeoutSec: 15
+    keepAliveSec: 30
