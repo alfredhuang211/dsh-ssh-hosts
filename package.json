@@ -1,6 +1,6 @@
 {
   "name": "dsh-ssh-hosts",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "DeepSeek Harness 插件：保存多台 SSH 服务器并在 agent 会话中按主机名引用（命令执行 + 远端文件读写），可在设置界面里管理。",
   "keywords": [
     "dsh",
@@ -38,6 +38,7 @@
     "icon.svg",
     "cordis.patch.yml",
     "ssh-hosts.example.yaml",
+    "docs",
     "README.md"
   ],
   "peerDependencies": {

@@ -397,7 +397,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 | `lib/command.js` | `/ssh` 斜杠命令：会话窗口「+」菜单那一行的 host 侧行为 |
 | `client/bundle.js` | 浏览器半边：插件页卡片 + 设置侧栏「SSH 主机」，窄列纵向布局、登录方式/密码编辑、「怎么用」提示，以及 `/ssh` 的主机选择弹窗；无构建步骤 |
 | `lib/index.js` | `name` / `inject: ['tools']` / `Config` / `apply`；装载期即校验清单，`ctx.effect` 回收资源与路由 |
-| `test/*.test.mjs` | 202 个测试（含界面链路、volatile 回归、密码 askpass、浏览器半边渲染、`/ssh` 命令契约）；`test/remote.test.mjs` 为真实服务器集成测试（默认跳过，密码用例需显式给密码） |
+| `test/*.test.mjs` | 211 个测试（含界面链路、volatile 回归、密码 askpass、浏览器半边渲染、`/ssh` 命令契约）；`test/remote.test.mjs` 为真实服务器集成测试（默认跳过，密码用例需显式给密码） |
 | `LICENSE` / `.github/workflows/test.yml` | MIT 许可证；CI 在 Node 22.x / 24.x 上跑 `npm ci && npm test`（真实服务器用例因缺环境变量自动跳过） |
 | `scripts/smoke-remote.mjs` | 把模型会看到的每一步原样打印 |
 | `scripts/smoke-ui.mjs` | 界面链路端到端（路由 → 写文件 → 重载 → 真实 SSH）；给了 `DSH_SSH_HOSTS_REMOTE_PASSWORD` 时额外跑一遍密码登录 |
@@ -406,7 +406,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 
 | 项 | 结果 |
 | --- | --- |
-| 单测 `npm test` | 202 个用例，189 通过 / 13 跳过（跳过的就是真实服务器用例）/ 0 失败 |
+| 单测 `npm test` | 211 个用例，198 通过 / 13 跳过（跳过的就是真实服务器用例）/ 0 失败 |
 | 真实服务器集成 `DSH_SSH_HOSTS_REMOTE=1 node --test test/remote.test.mjs` | 12/12 通过：真实 `uname`、cwd、`exit 66`、非零退出、超时 kill、`/etc` 列目录、not-a-directory、write→read→edit→覆盖写、**覆盖写保留 600 权限**、not-found、not-unique 不改文件、认证失败提示 |
 | 真实服务器**密码登录**（`DSH_SSH_HOSTS_REMOTE_PASSWORD` 显式给出，只走环境变量） | 13/13 通过：**不给密钥、只给密码**时 `ssh_run` 返回 `Linux`；凭据没值时在起进程前报 auth 并说明去哪儿填；错密码报 auth（`NumberOfPasswordPrompts=1`，不会挂住或撞锁） |
 | 密码链路端到端（真 `credentials-local` + 真插件 + 真界面路由 + 真 ssh + 真服务器，scratch `DSH_HOME`） | 界面 `POST /hosts` 带密码 → `passwordSupported: true`、`password: set`；清单只留 `passwordRef`（0600）**且不含明文**；凭据库 `.credentials.yaml` 0600 且确有值；界面回报 `passwordConfigured: true / source: file` 而**响应不含明文**；仅凭密码 `ssh_run` → `exit 0 / "Linux\nubuntu"`；`ssh_read`（sftp 通道）同样成功；模型投影只有 `auth: "password"`；删除主机 → `clearedPassword: true` 且凭据库里的值消失；全程未触碰真实 `~/.dsh` |
@@ -418,7 +418,7 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 | 真实 cordis 装载 | `Context + SystemPrompt + ToolRuntime + 本插件` 一次装成，`ctx.tools.get('ssh_run')` 可达，7 个工具全部注册；有 `webServer`/`connection` 时路由一并挂上，无则静默降级 |
 | 真实 CLI 安装 | `dsh plugin --profile web add <dir>` → profile `dsh.profile.bundles` 自动追加 `dsh-ssh-hosts`；`dsh web --dump-config` 组出 `# == dsh-ssh-hosts` 层；再通过 profile 的 `node_modules/dsh-ssh-hosts` 软链接 + 安装目录里的 cordis/dsh-tools 启动，7 个工具全部注册（以上均在 `/tmp` 里的临时 DSH_HOME 完成，未改动真实 profile） |
 | tgz 安装（0.3.0） | 临时 DSH_HOME 里 `dsh plugin --profile web add ./dsh-ssh-hosts-0.3.0.tgz` 成功，包内含 `client/bundle.js`，`--dump-config` 组出同一层。profile 里不装 `@deepseek-ai/*`：桌面端由 `dsh-plugin-desktop-beta/src/module-resolution.ts` 的 profile 解析器兜底（profile → `~/.dsh/profiles/node_modules` → App 安装树），所以插件里的 `@deepseek-ai/dsh-tools` 引用在 App 内可解析 |
-| 公开仓库 + CI | https://github.com/alfredhuang211/dsh-ssh-hosts（MIT，公开）：`git archive HEAD` 导出干净树 → `npm ci`（23 个包，全部来自 registry.npmjs.org）→ `npm test` 得 202/189/0/13，与本地一致；GitHub Actions 上 Node 22.x 与 24.x 两个矩阵任务均 success（日志里可见 `# tests 202` / `# fail 0`）。仓库里的测试机域名、用户、密钥路径都是占位值，真实值通过 `DSH_SSH_HOSTS_REMOTE_*` 传入；`.test-keys/`、`node_modules/`、`*.tgz` 由 `.gitignore` 挡住，远端树已核对无私钥/凭据 |
+| 公开仓库 + CI | https://github.com/alfredhuang211/dsh-ssh-hosts（MIT，公开）：`git archive HEAD` 导出干净树 → `npm ci`（23 个包，全部来自 registry.npmjs.org）→ `npm test` 得 202/189/0/13（v0.4.0 时点），与本地一致；GitHub Actions 上 Node 22.x 与 24.x 两个矩阵任务均 success。仓库里的测试机域名、用户、密钥路径都是占位值，真实值通过 `DSH_SSH_HOSTS_REMOTE_*` 传入；`.test-keys/`、`node_modules/`、`*.tgz` 由 `.gitignore` 挡住，远端树已核对无私钥/凭据 |
 | 桌面 profile 安装 | `dsh plugin --profile desktop add` 被 Electron 独占策略拒绝；改为按 App 写入的形态加 `link:` 依赖 + `dsh.profile.bundles` 条目，`node_modules/dsh-ssh-hosts` 软链到本目录，重启 App 即可加载（真实 GUI 点选路径仍待你确认） |
 
 测试目标机：一台真实服务器（Ubuntu 20.04 / Linux 5.4，用户 `ubuntu`；域名/用户/端口/密钥路径都通过 `DSH_SSH_HOSTS_REMOTE_*` 环境变量传入，仓库里只留占位值），仅用 `.test-keys/id_ed25519` 密钥认证，密码从未落盘。
@@ -441,7 +441,83 @@ OpenSSH 官方的非交互密码通道是 `SSH_ASKPASS`：ssh 需要密码时不
 ### 仍未验证（需要你在真实桌面环境里确认）
 
 - 桌面 **设置 → 插件** 页里安装本目录/tgz 并「启用」的完整 UI 路径（CLI 路径已实测通过）。
-- **卡片在桌面 App 里的真实渲染**：插件页卡片与设置侧栏「SSH 主机」是否出现、窄列下是否真的没有横向滚动、按钮是否照预期工作（重启 App 后才能看到，客户端半边在启动时装载）。界面逻辑已用 React 替身渲染过，但没有真实浏览器/CSS 布局引擎参与 —— 「不横向滚动」目前是**布局规则层面的断言**，不是像素层面的。
+- **卡片在桌面 App 里的真实渲染**：插件页卡片与设置侧栏「SSH 主机」是否出现、按钮是否照预期工作（重启 App 后才能看到，客户端半边在启动时装载）。窄列「不横向滚动」已在真实 Chrome + 真实 React 下做过像素级验收（§15.5，340/360/680 三档均 0 溢出、0 裁切），但**宿主内嵌环境**里的实际观感（字体、主题变量、槽位容器宽度）仍需重启后确认。
 - 桌面应用里的实际对话：模型能否在第 1 轮就正确挑主机（取决于 profile 的 `defaultHost` 与模型对工具描述的理解）。
 - **「+」菜单里的 `ssh` 那一行在真实 GUI 里的观感**：候选来自 host 命令目录（已用真实 cordis 验证注册成功），但菜单渲染、弹窗列表的排版、选中后的命令节点在会话里的样子，只有重启桌面应用后才看得到 —— 我没有真实浏览器可用，这部分是逻辑层验证（弹窗 options/onSelect 用 React 替身跑过），不是像素层。
 - Windows 目标机（本插件走系统 OpenSSH 客户端，Windows 上不可用）。
+
+---
+
+## 15. 配置界面的第二轮优化（决策记录 + 像素级验收）
+
+### 15.1 这一轮要解决什么
+
+第一版把「能加进去」当成了终点：删除一步就删、字段填错要等一次 400、测试连接的结果掉进底部日志、主机多了没法找、密码状态只有一行小字。第二轮的目标只有一句：**在 340px 宽的设置侧栏里，让「加进来、确认能连、别删错」三件事不需要看文档**。
+
+取舍：密度、就地反馈、防误操作优先于装饰 —— 所以没加图标库、没加折叠动画、没动信息架构。
+
+### 15.2 设计规格（同时写进产物头部注释）
+
+| 维度 | 决定 |
+| --- | --- |
+| 目的 | 运维/开发者在窄列里把服务器接进 agent；主路径 = 新增 → 测试 → 引用 |
+| 风格 | Industrial / utilitarian（运维控制台），不是产品落地页 |
+| 色彩 | 只用宿主 token：`--dsw-border` / `--dsw-accent`（仅主操作）/ `--dsw-danger`，另加低饱和 `#1a7f37`（成功）、`#9a6700`（警告）；无紫、无渐变 |
+| 字体 | **继承宿主**，卡片不指定 `font-family` |
+| 布局 | 单列纵向；表单 `repeat(auto-fit, minmax(180px, 1fr))`；长路径 `break-all`；绝不横向滚动 |
+
+**对 `ui-design` skill 默认规则的显式覆盖**：该 skill 要求自选字体、避开系统字体、按 Tailwind 风格落地。这里不适用 —— 卡片是宿主设置面板的一部分，自带字体/Tailwind/图标库只会和 App 其余部分打架，而且客户端半边的模块表只提供 `react` 与 `--dsw-*` 变量。覆盖是**有理由的**：对比度、层级、就地反馈这些可迁移的规则仍然照做（按钮一律文字标签，不用 emoji 当图标）。
+
+### 15.3 八项改动
+
+1. **删除二次确认**（在块内）：说清「清单里会移除它，已存密码也一并清除」；确认态不再显示「编辑」，避免误触。
+2. **就地校验**：`validateDraft()` 与服务端 `lib/hosts.js` 同规则（名称字符集与重名、地址、端口 1-65535、用户、私钥路径、远端绝对路径、备注 400、跳板机写法、密码登录必须有密码、profile 无凭据服务时提前说明）。错误红框 + 说明文案；保存失败也留在表单里，不丢到底部。
+3. **测试结果就地显示**：`running / ok（耗时 + 远端首行）/ fail（exit code + 原因首行）`；按钮改成「测试连接 / 测试中…」。
+4. **过滤框**：名称/地址/用户/标签/备注/认证方式任一命中，显示「匹配 n / m 台」，无匹配时给「清除过滤」。
+5. **空状态**：直接给「新增主机」+ 手工编辑提示 + 「最少只要两项」。
+6. **键盘与无障碍**：`Enter` 保存、`Esc` 取消（焦点在下拉框时不误提交）；错误 `role="alert"`、日志 `aria-live="polite"`、忙碌 `role="status"`。
+7. **密码区**：状态徽章「已保存（来源）/ 未设置」+ 显示/隐藏 + 清除需二次确认。
+8. **人话忙碌文案**：`busyText()` 把内部动作名换成「正在保存… / 正在测试 web-01 的连接…」。
+
+### 15.4 实现期挖出来的坑：React DOM 的 dev 构建会冻结 `style`
+
+用真实 React（18.3.1 UMD，dev 构建）在无头 Chrome 里渲染卡片时，第二次渲染抛：
+
+```
+TypeError: Cannot assign to read only property 'marginBottom' of object '#<Object>'
+    at Object.assign (<anonymous>)
+    at Card (client/bundle.js:713)
+```
+
+根因不在 React，而在产物自己：`react-dom` 的 dev 构建在 `setInitialDOMProperties` 里对**收到的每个 `style` 对象**调用 `Object.freeze`（`react-dom.js` 的 `__DEV__` 分支）。而产物把共享样式常量 `muted` 直接当 `style` 传出去，之后又用 `Object.assign(muted, {...})` **原地修改**它 —— 第一次渲染后 `muted` 已被冻结，第二次渲染必炸。生产构建不冻结，所以桌面 App 里看不出来：这是**只在 dev 构建下暴露的潜在缺陷**（0.4.0 就带着它）。
+
+修法：共享样式只当只读底稿，新增 `mutedWith(extra)` 一律返回新对象，18 处原地修改全部替换。两条回归测试钉住：
+
+- 行为层：React 替身加 `freezeStyles` 选项（复刻 dev 构建行为），整张卡片渲染两遍必须不抛错；
+- 源码层：断言 `Object.assign(<共享样式常量>, …)` 这种写法不存在。
+
+（把其中一处故意改回原样验证过：两条测试都会红。）
+
+### 15.5 像素级验收（不再只是「布局规则层面的断言」）
+
+方法：像宿主那样加载产物（`window.__ModuleLoader__` 捕获 + `factory(require)` 注入真实 React），用假数据渲染真实组件，再用无头 Chrome 截图并跑结构自检：
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+  --window-size=1500,2368 --virtual-time-budget=9000 \
+  --screenshot=preview.png file:///tmp/uipreview/preview.html
+```
+
+自检结果从 DOM 里读回来（不靠肉眼）：
+
+| 检查 | 结果 |
+| --- | --- |
+| 340px 窄列卡片 | `scrollWidth == clientWidth == 340`，0 个横向溢出元素 |
+| 360px 设置侧栏 / 680px 插件页 | 同样 0 溢出（`360/360`、`680/680`） |
+| 文字裁切 | `scrollHeight > clientHeight` 的元素 0 个 |
+| 空状态 / 过滤台数 / 测试成功 / 测试失败 / 删除确认 / 未生效提示 / 编辑器错误 / 密码徽章 | 8 项断言全为 true |
+| 密码不外露 | 卡片文本里不含 `passwordRef` 的值 |
+| 像素 | 非白像素 5.2%（接触表）/ 12.2%（卡片）；危险红与主色蓝都出现在该出现的位置 |
+
+截图产物：`docs/settings-card.png`（README 引用）。

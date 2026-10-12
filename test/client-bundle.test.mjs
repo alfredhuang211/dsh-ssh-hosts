@@ -18,10 +18,13 @@ const here = dirname(fileURLToPath(import.meta.url))
 const bundlePath = join(here, '..', 'client', 'bundle.js')
 const source = readFileSync(bundlePath, 'utf8')
 
-/** 最小 React 替身：足够让 h(...) 建树、useState 给出初值 */
-function fakeReact() {
+/** 最小 React 替身：足够让 h(...) 建树、useState 给出初值。
+ *  freezeStyles 复刻 react-dom dev 构建的行为：它会把收到的每个 style 对象冻结
+ *  （见 setInitialDOMProperties），所以共享样式常量一旦被原地修改，第二次渲染就会抛错。 */
+function fakeReact({ freezeStyles = false } = {}) {
   return {
     createElement(type, props, ...children) {
+      if (freezeStyles && props && props.style) Object.freeze(props.style)
       return { type, props: { ...(props ?? {}), children: children.length <= 1 ? children[0] : children } }
     },
     useState(initial) {
@@ -244,8 +247,9 @@ test('主机块：纵向堆叠、给出认证方式与密码状态，且不含�
   assert.match(text, /密码/)
   assert.match(text, /已保存（file）/)
   assert.match(text, /编辑/)
-  assert.match(text, /测试/)
-  assert.match(text, /设为默认/)
+  assert.match(text, /测试连接/)
+  // 已经是默认主机：按钮变成禁用态的「已是默认」，不再让人点了个没反应的按钮
+  assert.match(text, /已是默认/)
   assert.match(text, /删除/)
   // 凭据名与密码值都不出现在渲染结果里
   assert.equal(text.includes('DSH_SSH_HOSTS_PASSWORD_PW_01'), false)
@@ -268,7 +272,10 @@ test('编辑器：登录方式可选、密码是 write-only 输入框、可清�
   const text = textOf(tree)
   assert.match(text, /登录方式/)
   assert.match(text, /清除已存密码/)
-  assert.match(text, /当前：已保存/)
+  assert.match(text, /已存密码/)
+  assert.match(text, /已保存（file）/)
+  assert.match(text, /显示密码/)
+  assert.match(text, /Enter 保存，Esc 取消/)
   const inputs = []
   const selects = []
   walk(tree, node => {
@@ -318,7 +325,7 @@ test('「怎么用」块：直接给出引用方式', async () => {
 })
 
 /** 带状态的 React 替身：够跑「首屏 → 跑 effect → 二次渲染」这条真实路径 */
-function statefulReact() {
+function statefulReact({ freezeStyles = false } = {}) {
   const slots = []
   let cursor = 0
   const effects = []
@@ -329,6 +336,7 @@ function statefulReact() {
     },
     __runEffects() { effects.splice(0).forEach(fn => fn()) },
     createElement(type, props, ...children) {
+      if (freezeStyles && props && props.style) Object.freeze(props.style)
       return { type, props: { ...(props ?? {}), children: children.length <= 1 ? children[0] : children } }
     },
     useState(initial) {
@@ -500,4 +508,186 @@ test('选中主机 = 提交 /ssh <名字>；会话未就绪或命令缺失时报
 
   const failed = { binding: () => ({ session: { command: () => Promise.resolve({ ok: false, error: { code: 'internal', message: 'boom' } }) } }) }
   await assert.rejects(() => pickHost(failed, { id: 'web-01' }, { sessionId: 's' }), /internal: boom/)
+})
+
+test('校验：必填 / 名称字符集 / 端口范围 / 重名 / 密码缺失，都给可照做的文案', async () => {
+  const { validateDraft, emptyDraft } = await internals()
+  const base = { ...emptyDraft(), name: 'web-01', host: '10.0.0.11' }
+  assert.deepEqual(validateDraft(base, {}), {})
+
+  assert.match(validateDraft({ ...base, name: '' }, {}).name, /必填/)
+  assert.match(validateDraft({ ...base, name: '-bad' }, {}).name, /字母或数字开头/)
+  assert.match(validateDraft({ ...base, name: 'a'.repeat(65) }, {}).name, /64 字符/)
+  assert.match(validateDraft({ ...base, host: '' }, {}).host, /必填/)
+  assert.match(validateDraft({ ...base, host: 'http://x' }, {}).host, /域名/)
+
+  for (const port of ['0', '70000', '22a', '-1']) {
+    assert.match(validateDraft({ ...base, port }, {}).port, /1-65535/, `端口 ${port} 应被拦下`)
+  }
+  assert.deepEqual(validateDraft({ ...base, port: '2222' }, {}), {})
+  assert.match(validateDraft({ ...base, user: 'a b' }, {}).user, /用户名/)
+
+  // 重名 = 会覆盖别人的主机：新增时拦下，编辑它自己时放行
+  assert.match(validateDraft(base, { existingNames: ['web-01'] }).name, /已有同名主机/)
+  assert.deepEqual(validateDraft(base, { existingNames: ['web-01'], previousName: 'web-01' }), {})
+
+  // 私钥路径与远端目录：相对路径是最常见的坑
+  const keyDraft = { ...base, auth: 'key', identityFile: 'keys/id_ed25519' }
+  assert.match(validateDraft(keyDraft, {}).identityFile, /绝对路径或 ~/)
+  assert.deepEqual(validateDraft({ ...keyDraft, identityFile: '~/.ssh/id_ed25519' }, {}), {})
+  assert.match(validateDraft({ ...base, defaultWorkdir: 'srv/app' }, {}).defaultWorkdir, /绝对路径/)
+  assert.match(validateDraft({ ...base, proxyJump: 'bast ion' }, {}).proxyJump, /user@host:port/)
+
+  // 密码登录必须至少填一次；已存过的可以留空；没有凭据服务时提前说清楚
+  const pwDraft = { ...base, auth: 'password' }
+  assert.match(validateDraft(pwDraft, {}).password, /至少要填一次/)
+  assert.deepEqual(validateDraft({ ...pwDraft, password: 'x' }, {}), {})
+  assert.deepEqual(validateDraft({ ...pwDraft, passwordRef: 'REF' }, { passwordConfigured: true }), {})
+  assert.match(validateDraft({ ...pwDraft, password: 'x' }, { passwordSupported: false }).password, /没有凭据服务/)
+})
+
+test('过滤：名称/地址/标签/备注/认证方式任一命中，大小写不敏感', async () => {
+  const { filterHosts } = await internals()
+  const keyHost = { ...PASSWORD_HOST, name: 'db-01', host: '10.0.0.12', user: 'ro', tags: ['db'], description: '只读从库', passwordRef: '', passwordConfigured: false, identityFile: '/k/id' }
+  const hosts = [PASSWORD_HOST, keyHost]
+  assert.equal(filterHosts(hosts, '').length, 2, '空查询原样返回')
+  assert.deepEqual(filterHosts(hosts, 'db-01').map(host => host.name), ['db-01'])
+  assert.deepEqual(filterHosts(hosts, '10.0.0.21').map(host => host.name), ['pw-01'])
+  assert.deepEqual(filterHosts(hosts, '只读从库').map(host => host.name), ['db-01'])
+  assert.deepEqual(filterHosts(hosts, '密钥').map(host => host.name), ['db-01'], '认证方式也能搜')
+  assert.deepEqual(filterHosts(hosts, 'PROD').map(host => host.name), ['pw-01'])
+  assert.equal(filterHosts(hosts, '不存在的主机').length, 0)
+})
+
+test('忙碌文案说人话（不是内部动作名）', async () => {
+  const { busyText } = await internals()
+  assert.equal(busyText(null), '')
+  assert.equal(busyText({ kind: 'save' }), '正在保存…')
+  assert.equal(busyText({ kind: 'test', name: 'web-01' }), '正在测试 web-01 的连接…')
+  assert.equal(busyText({ kind: 'remove', name: 'web-01' }), '正在删除 web-01…')
+  assert.equal(busyText({ kind: 'default', name: 'web-01' }), '正在把 web-01设为默认…')
+  assert.match(busyText({ kind: 'reload' }), /重新读取/)
+})
+
+test('主机块：删除要先确认，且说清会连带清掉什么', async () => {
+  const { HostBlock } = await internals()
+  const plain = textOf(HostBlock({ host: { ...PASSWORD_HOST, passwordRef: '' }, isDefault: false, busy: false }))
+  assert.match(plain, /设为默认/)
+
+  const confirming = textOf(HostBlock({ host: PASSWORD_HOST, isDefault: false, busy: false, confirming: true }))
+  assert.match(confirming, /确认删除/)
+  assert.match(confirming, /取消/)
+  assert.match(confirming, /已存密码也一并清除/)
+  assert.equal(confirming.includes('编辑'), false, '确认态不再给「编辑」，避免误触')
+})
+
+test('主机块：连通性结果就地显示；加载失败的条目给出原因', async () => {
+  const { HostBlock } = await internals()
+  const ok = textOf(HostBlock({ host: PASSWORD_HOST, isDefault: false, busy: false, test: { status: 'ok', text: '连接正常（12 ms）' } }))
+  assert.match(ok, /连接正常（12 ms）/)
+  const fail = textOf(HostBlock({ host: PASSWORD_HOST, isDefault: false, busy: false, test: { status: 'fail', text: '连接失败（exit 255）：Permission denied' } }))
+  assert.match(fail, /连接失败（exit 255）/)
+  const broken = textOf(HostBlock({ host: { ...PASSWORD_HOST, inUse: false }, isDefault: false, busy: false }))
+  assert.match(broken, /未生效/)
+  assert.match(broken, /重新读取/, '未生效的条目要告诉人怎么修')
+})
+
+test('编辑器：错误就地显示在字段上；Enter 保存 / Esc 取消', async () => {
+  const { HostEditor, draftOf } = await internals()
+  let saved = 0
+  let cancelled = 0
+  const tree = HostEditor({
+    draft: draftOf(PASSWORD_HOST), previousName: 'pw-01', busy: false, passwordSupported: true,
+    existing: PASSWORD_HOST, errors: { port: '端口是 1-65535 的整数' },
+    formError: '还有 1 处需要改一下（红框处）。',
+    setDraft: () => {}, onSave: () => { saved += 1 }, onCancel: () => { cancelled += 1 }
+  })
+  const text = textOf(tree)
+  assert.match(text, /端口是 1-65535 的整数/)
+  assert.match(text, /还有 1 处需要改一下/)
+
+  const alerts = []
+  walk(tree, node => { if (node.props?.role === 'alert') alerts.push(node) })
+  assert.ok(alerts.length >= 2, '错误要用 role=alert 暴露给读屏')
+
+  let container = null
+  walk(tree, node => {
+    if (container === null && node.type === 'div' && typeof node.props?.onKeyDown === 'function') container = node
+  })
+  assert.ok(container, '表单容器要处理键盘')
+  const press = tagName => ({ key: tagName === 'Escape' ? 'Escape' : 'Enter', target: { tagName }, preventDefault() {} })
+  container.props.onKeyDown(press('INPUT'))
+  assert.equal(saved, 1, 'Enter 应触发保存')
+  container.props.onKeyDown(press('Escape'))
+  assert.equal(cancelled, 1, 'Esc 应触发取消')
+  container.props.onKeyDown(press('SELECT'))
+  assert.equal(saved, 1, '焦点在下拉框上时 Enter 不该提交表单')
+})
+
+test('整张卡片：没有主机时给出可照做的空状态', async () => {
+  const React = statefulReact()
+  const { moduleExports } = await loadBundle(() => React)
+  const Card = moduleExports.__test.Card
+  const view = {
+    file: '/home/u/.dsh/ssh-hosts.yaml', writable: true, source: 'file', reason: '',
+    defaultHost: '', configuredDefaultHost: '', error: null,
+    fileInfo: { exists: false }, passwordSupported: true, hosts: []
+  }
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: true, value: view }) })
+  try {
+    React.__render(Card, {})
+    React.__runEffects()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const text = textOf(React.__render(Card, {}))
+    assert.match(text, /还没有主机/)
+    assert.match(text, /新增主机/)
+    assert.match(text, /重新读取/)
+    assert.equal(text.includes('怎么用'), false, '没有主机时不显示「怎么用」')
+  } finally {
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})
+
+test('整张卡片：多台主机时出现过滤框与台数（style 被冻结也照样重渲染）', async () => {
+  // 用 dev 构建那样的冻结行为跑：共享样式若被原地改，第二次渲染会抛 TypeError。
+  const React = statefulReact({ freezeStyles: true })
+  const { moduleExports } = await loadBundle(() => React)
+  const Card = moduleExports.__test.Card
+  const view = {
+    file: '/home/u/.dsh/ssh-hosts.yaml', writable: true, source: 'file', reason: '',
+    defaultHost: '', configuredDefaultHost: '', error: null,
+    fileInfo: { exists: true, mode: '0600' }, passwordSupported: true,
+    hosts: [PASSWORD_HOST, { ...PASSWORD_HOST, name: 'db-01', host: '10.0.0.12', passwordRef: '', passwordConfigured: false }]
+  }
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: true, value: view }) })
+  try {
+    React.__render(Card, {})
+    React.__runEffects()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    React.__render(Card, {})
+    const tree = React.__render(Card, {})
+    const text = textOf(tree)
+    assert.match(text, /共 2 台/)
+    const searches = []
+    walk(tree, node => { if (node.type === 'input' && node.props.type === 'search') searches.push(node.props) })
+    assert.equal(searches.length, 1, '主机多于一台时给一个过滤框')
+    assert.match(searches[0]['aria-label'], /过滤/)
+  } finally {
+    if (previousFetch === undefined) delete globalThis.fetch
+    else globalThis.fetch = previousFetch
+  }
+})
+
+test('共享样式常量只能当只读底稿（React DOM dev 构建会冻结 style）', async () => {
+  // 这条是上面那个 TypeError 的源码级护栏：任何一个共享 style 常量被 Object.assign
+  // 原地修改，都会在 dev 构建里第二次渲染时炸掉。
+  const shared = ['muted', 'rootStyle', 'inputStyle', 'buttonStyle', 'rowStyle', 'actionsStyle', 'codeStyle', 'badgeStyle', 'boxStyle']
+  for (const name of shared) {
+    const mutating = new RegExp(`Object\\.assign\\(${name}\\s*[,)]`)
+    assert.equal(mutating.test(source), false, `${name} 是共享样式常量，不能原地修改`)
+  }
+  assert.match(source, /function mutedWith\(/, '要有返回新对象的 mutedWith 辅助')
 })
