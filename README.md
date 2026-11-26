@@ -288,6 +288,17 @@ SSH_ASKPASS=$PWD/.test-keys/askpass.sh SSH_ASKPASS_REQUIRE=force \
 - 界面卡片按**窄列**设计（设置侧栏那种宽度）：主机是纵向堆叠的块，字段自动换行，不会出现横向滚动。
 - 官方另有一套 provider 形态的 `@deepseek-ai/dsh-ssh` / `dsh-fs-ssh` / `dsh-subprocess-ssh` / `dsh-sandbox-ssh`：它们把 `ctx.fs` / `ctx.subprocess` 整体换到单台远端机，属于「部署组合」而非多机工具。本插件与它们不冲突，也不依赖它们。
 
+## 开发与发布
+
+开发、测试、发版和排错步骤见 **[DEVELOPMENT.md](DEVELOPMENT.md)**：
+
+```bash
+npm ci && npm test                    # 测试
+npm pack --dry-run                    # 发布前检查产物
+```
+
+发布由 GitHub Actions 在打 `v*` 标签时通过 OIDC 自动完成，仓库里没有 `NPM_TOKEN`。
+
 ## 许可证
 
 MIT（见 [LICENSE](LICENSE)）。测试机相关的主机名/用户/密钥路径在仓库里都是占位值，通过 `DSH_SSH_HOSTS_REMOTE_*` 环境变量传入；真实凭据从不入库。
