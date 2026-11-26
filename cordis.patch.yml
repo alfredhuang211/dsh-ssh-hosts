@@ -14,4 +14,4 @@
 #
 - insert:
     - id: ssh-hosts
-      name: 'dsh-ssh-hosts'
+      name: '@alfredhuang211/dsh-ssh-hosts'

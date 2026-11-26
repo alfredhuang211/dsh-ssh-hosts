@@ -1,6 +1,7 @@
 {
-  "name": "dsh-ssh-hosts",
+  "name": "@alfredhuang211/dsh-ssh-hosts",
   "version": "0.5.0",
+  "packageManager": "npm@>=10",
   "description": "DeepSeek Harness 插件：保存多台 SSH 服务器并在 agent 会话中按主机名引用（命令执行 + 远端文件读写），可在设置界面里管理。",
   "keywords": [
     "dsh",
@@ -16,11 +17,13 @@
     ".": "./lib/index.js",
     "./client": "./client/bundle.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
   },
   "engines": {
     "node": ">=22",
-    "dsh": ">=0.2.0-rc.1 <0.3.0"
+    "dsh": ">=0.2.0-rc.1 <0.3.0 || >=0.2.3-alpha.2 <0.3.0"
   },
   "dsh": {
     "bundle": {
@@ -39,7 +42,8 @@
     "cordis.patch.yml",
     "ssh-hosts.example.yaml",
     "docs",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
@@ -68,5 +72,8 @@
   "bugs": {
     "url": "https://github.com/alfredhuang211/dsh-ssh-hosts/issues"
   },
-  "author": "alfredhuang"
+  "author": "alfredhuang",
+  "publishConfig": {
+    "access": "public"
+  }
 }

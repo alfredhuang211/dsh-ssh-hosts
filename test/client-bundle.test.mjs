@@ -104,7 +104,7 @@ function fakeClientCtx({ commandUi, sessions } = {}) {
 
 test('产物是自注册 classic script，用的是宿主模块表', () => {
   assert.match(source, /window\.__ModuleLoader__\.load\(\{/)
-  assert.match(source, /id: 'dsh-ssh-hosts'/)
+  assert.match(source, /id: '@alfredhuang211\/dsh-ssh-hosts'/)
   // 没有 ESM 语法：它是 classic script，不是 ESM 产物
   assert.doesNotMatch(source, /^\s*import\s/m)
   assert.doesNotMatch(source, /^\s*export\s/m)
@@ -114,7 +114,7 @@ test('产物是自注册 classic script，用的是宿主模块表', () => {
 
 test('factory 返回宿主需要的插件对象', async () => {
   const { id, moduleExports, requested } = await loadBundle()
-  assert.equal(id, 'dsh-ssh-hosts')
+  assert.equal(id, '@alfredhuang211/dsh-ssh-hosts')
   assert.deepEqual(requested, ['react'])
   assert.deepEqual(moduleExports.inject, ['slots'])
   assert.equal(moduleExports.name, 'ssh-hosts')
@@ -128,7 +128,7 @@ test('apply 在两处注册卡片：插件页配置 + 设置分区', async () =>
 
   assert.deepEqual(client.injected, ['plugins.bundle.config', 'settings.section'])
   const bySlot = new Map(client.registered.map(entry => [entry.options.name, entry.options]))
-  assert.equal(bySlot.get('plugins.bundle.config').key, 'dsh-ssh-hosts')
+  assert.equal(bySlot.get('plugins.bundle.config').key, '@alfredhuang211/dsh-ssh-hosts')
   assert.equal(bySlot.get('settings.section').id, 'ssh-hosts')
   assert.equal(bySlot.get('settings.section').order, 55)
   assert.equal(bySlot.get('settings.section').label(), 'SSH 主机')

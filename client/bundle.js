@@ -36,7 +36,7 @@
  *  - 表单用 auto-fit 网格，宽了就两列，窄了自动落成一列。
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-ssh-hosts',
+  id: '@alfredhuang211/dsh-ssh-hosts',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
@@ -906,7 +906,7 @@ window.__ModuleLoader__.load({
           return ctx.slots.inject('plugins.bundle.config', function () {
             return ctx.slots.register({
               name: 'plugins.bundle.config',
-              key: 'dsh-ssh-hosts',
+              key: '@alfredhuang211/dsh-ssh-hosts',
               inject: function () { return {} }
             }, function BundleConfigSlot() {
               return h(Card, {})

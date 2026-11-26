@@ -1,0 +1,100 @@
+name: publish
+
+# Publishing runs from a tag, never from a branch push: the tag is the decision,
+# and the workflow only carries it out. `v*` matches this repository's existing
+# tag convention (v0.5.0).
+on:
+  push:
+    tags:
+      - 'v*'
+  # A dry run from the Actions tab that publishes nothing, to check the whole
+  # pipeline (install, test, pack) after a dependency or workflow change.
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Only build and pack; do not publish'
+        type: boolean
+        default: true
+
+# Trusted publishing (OIDC) needs `id-token: write`; nothing else is written.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Must match the trusted publisher's "Environment name" on npmjs.com when one
+    # is configured there. Empty here means no GitHub environment is required.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The package requires Node >=22; 22 is the floor it declares.
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          # Never reuse a dependency cache in a release build: a poisoned or
+          # stale cache would end up inside a published artifact.
+          package-manager-cache: false
+
+      - name: Install
+        run: npm ci
+
+      # The suite runs here too, even though `test.yml` also runs on a tag push:
+      # those two workflows are independent, so nothing orders the test before
+      # this publish. Duplicating ~40s of tests is cheaper than a release that
+      # ships without them having passed in this same run.
+      - name: Test
+        run: npm test
+
+      # `npm pack` runs `prepack` (build) where the package declares one, and
+      # proves the tarball is producible before anything is published.
+      - name: Pack
+        run: npm pack --dry-run
+
+      - name: Check the tag matches the manifest version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          manifest="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$manifest" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $manifest"
+            exit 1
+          fi
+          echo "Tag and manifest agree on $manifest"
+
+      # OIDC: npm exchanges the GitHub-issued identity token for a short-lived
+      # publish token. No NPM_TOKEN secret is read here, and none should be set.
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm publish --access public --provenance
+
+      - name: Publish (dry run requested)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry-run
+        run: |
+          echo "Dry run: skipping publish. The pack step above proved the tarball builds."
+
+      - name: Verify the release is installable
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          # npm registers the version before its tarball is servable; poll until
+          # the artifact actually downloads, because that is what consumers hit.
+          for attempt in $(seq 1 40); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://registry.npmjs.org/${name}/-/${name#@*/}-${version}.tgz" || true)"
+            if [ "$code" = "200" ]; then
+              echo "::notice::$name@$version is installable"
+              exit 0
+            fi
+            echo "attempt $attempt: tarball HTTP $code; waiting"
+            sleep 15
+          done
+          echo "::error::$name@$version was published but its tarball never became available"
+          exit 1
