@@ -288,6 +288,14 @@ SSH_ASKPASS=$PWD/.test-keys/askpass.sh SSH_ASKPASS_REQUIRE=force \
 - 界面卡片按**窄列**设计（设置侧栏那种宽度）：主机是纵向堆叠的块，字段自动换行，不会出现横向滚动。
 - 官方另有一套 provider 形态的 `@deepseek-ai/dsh-ssh` / `dsh-fs-ssh` / `dsh-subprocess-ssh` / `dsh-sandbox-ssh`：它们把 `ctx.fs` / `ctx.subprocess` 整体换到单台远端机，属于「部署组合」而非多机工具。本插件与它们不冲突，也不依赖它们。
 
+## 更新记录
+
+### 0.5.1
+
+- 发布链路改为 GitHub Actions + npm Trusted Publishing（OIDC）：打 `v*` 标签自动发布，无需 `NPM_TOKEN`。
+- 新增 `DEVELOPMENT.md`，记录开发流程、改名影响面、发版步骤与排错。
+- 功能无变化；此版本用于让 npm 端的 trusted publisher 配置完成真实发布校验。
+
 ## 开发与发布
 
 开发、测试、发版和排错步骤见 **[DEVELOPMENT.md](DEVELOPMENT.md)**：
